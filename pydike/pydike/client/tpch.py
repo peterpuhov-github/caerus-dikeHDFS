@@ -7,13 +7,12 @@ import http.client
 import json
 from concurrent.futures import ThreadPoolExecutor
 import urllib.parse
-import pyarrow
-import pyarrow.parquet
 import numpy
 import duckdb
 import sqlparse
 
 from pydike.core.webhdfs import WebHdfsFile
+from pydike.core.parquet import ParquetReader
 
 
 class DataTypes:
@@ -29,34 +28,8 @@ class DataTypes:
     type = {'int64': INT64, 'float64': DOUBLE, 'object': BYTE_ARRAY}
 
 
-def read_col(pf, rg, col):
-    print(f'Read rg {rg}[{col}]')
-    data = pf.read_row_group(rg, columns=[col])
-    print(f'Read rg {rg}[{col}] done')
-    return data
-
-
-def read_parallel(f, rg, columns):
-    pf = pyarrow.parquet.ParquetFile(f)
-    # Serial reading
-    res = list()
-    for col in columns:
-        res.append(read_col(pf, rg, col).column(0))
-    return res
-
-    executor = ThreadPoolExecutor(max_workers=len(columns))
-    futures = list()
-    for col in columns:
-        fin = f.copy()
-        pfin = pyarrow.parquet.ParquetFile(fin, metadata=pf.metadata)
-        futures.append(executor.submit(read_col, pfin, rg, col))
-
-    return [r.result().column(0) for r in futures]
-
-
 logging_lock = threading.Lock()
-pyarrow_lock = threading.Lock()
-
+duckdb_lock = threading.Lock()
 
 class TpchSQL:
     def __init__(self, config):
@@ -86,17 +59,20 @@ class TpchSQL:
 
     def local_run(self):
         f = WebHdfsFile(self.config['url'])
-        pf = pyarrow.parquet.ParquetFile(f)
+        reader = ParquetReader(f)
         tokens = sqlparse.parse(self.config['query'])[0].flatten()
         sql_columns = set([t.value for t in tokens if t.ttype in [sqlparse.tokens.Token.Name]])
-        columns = [col for col in pf.schema_arrow.names if col in sql_columns]
+        # columns = [col for col in pf.schema_arrow.names if col in sql_columns]
+        columns = [col for col in reader.columns if col in sql_columns]
         self.log_message(columns)
         rg = int(self.config['row_group'])
-        # tbl = pyarrow.Table.from_arrays(read_parallel(f, rg, columns), names=columns)
-        pyarrow_lock.acquire()
-        tbl = pf.read_row_group(rg, columns)
-        pyarrow_lock.release()
-        self.df = duckdb.from_arrow_table(tbl).query("arrow", self.config['query']).fetchdf()
+        df = reader.read_rg(rg, columns)
+
+        # duckdb_lock.acquire()
+        self.df = duckdb.query_df(df, 'arrow', self.config['query']).fetchdf()
+        del df
+        # duckdb_lock.release()
+
         self.log_message(f'Computed df {self.df.shape}')
 
     def to_spark(self, outfile):
@@ -150,10 +126,11 @@ def run_test(row_group, args):
             'part-00000-badcef81-d816-44c1-b936-db91dae4c15f-c000.snappy.parquet'
     user = getpass.getuser()
     config = dict()
-    config['use_ndp'] = 'True'
+    config['use_ndp'] = 'False'
     config['row_group'] = str(row_group)
     config['query'] = "SELECT l_partkey, l_extendedprice, l_discount FROM arrow WHERE l_shipdate >= '1995-09-01' AND l_shipdate < '1995-10-01'"
     config['url'] = f'http://{args.server}/{fname}?op=SELECTCONTENT&user.name={user}'
+    config['verbose'] = args.verbose
 
     return TpchSQL(config)
 
