@@ -1,4 +1,5 @@
 import time
+import gc
 import argparse
 import threading
 import struct
@@ -98,13 +99,12 @@ class TpchSQL:
     def write_column(self, column, outfile):
         data = self.df[column].to_numpy()
         header = None
-        if data.dtype == 'object' and isinstance(data[0], str):
+        if data.dtype == 'object' and isinstance(data[0], str):  # BYTE_ARRAY
             s = data.astype(dtype=numpy.bytes_)
             data = s.tobytes()
             data_type = DataTypes.FIXED_LEN_BYTE_ARRAY
             header = numpy.array([data_type, s.dtype.itemsize, len(data), 0], numpy.int32)
-
-        else:  # Binary type
+        else:  # Binary type int64, float64, etc.
             data = data.byteswap().newbyteorder().tobytes()
             data_type = DataTypes.type[self.df.dtypes[column].name]
             header = numpy.array([data_type, 0, len(data), 0], numpy.int32)
@@ -115,9 +115,13 @@ class TpchSQL:
 def run_test(row_group, args):
     fname = '/tpch-test-parquet-1g/lineitem.parquet/' \
             'part-00000-badcef81-d816-44c1-b936-db91dae4c15f-c000.snappy.parquet'
+
+    # TPC-H 100 GB
+    fname = '/tpch-test-parquet/lineitem.parquet'
+
     user = getpass.getuser()
     config = dict()
-    config['use_ndp'] = 'False'
+    config['use_ndp'] = 'True'
     config['row_group'] = str(row_group)
     config['query'] = "SELECT l_partkey, l_extendedprice, l_discount FROM arrow WHERE l_shipdate >= '1995-09-01' AND l_shipdate < '1995-10-01'"
     config['url'] = f'http://{args.server}/{fname}?op=SELECTCONTENT&user.name={user}'
