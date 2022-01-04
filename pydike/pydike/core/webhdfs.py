@@ -1,11 +1,12 @@
 import os
+import time
 import urllib.parse
 import http.client
 import json
 
 
 class WebHdfsFile(object):
-    def __init__(self, name, user=None, buffer_size=(128 << 10), size=None, data_url=None):
+    def __init__(self, name, user=None, buffer_size=(128 << 10), orig=None):
         self.name = name
         self.user = user
         self.buffer_size = buffer_size
@@ -14,7 +15,7 @@ class WebHdfsFile(object):
         self.read_stats = []
         self.read_bytes = 0
         self.verbose = False
-        self.prefetch_buffer = bytearray(20 << 20)
+        self.prefetch_buffer = None
         self.prefetch_offset = -1
         self.prefetch_length = -1
 
@@ -24,12 +25,13 @@ class WebHdfsFile(object):
                 if 'user.name=' in q:
                     self.user = q.split('user.name=')[1]
 
-        if size is None:
+        if orig is None:
             self.size = self.get_size()
         else:
-            self.size = size
+            self.size = orig.size
+            self.offset = orig.offset
 
-        if data_url is None:
+        if orig is None:
             conn = http.client.HTTPConnection(self.url.netloc)
             req = f'/webhdfs/v1{self.url.path}?op=OPEN&user.name={self.user}&buffersize={self.buffer_size}'
             conn.request("GET", req)
@@ -37,13 +39,13 @@ class WebHdfsFile(object):
             self.data_url = urllib.parse.urlparse(resp.headers['Location'])
             conn.close()
         else:
-            self.data_url = data_url
+            self.data_url = orig.data_url
 
         query = self.data_url.query.split('&offset=')[0]
         self.data_req = f'{self.data_url.path}?{query}'
 
     def clone(self):
-        f = WebHdfsFile(self.name, user=self.user, buffer_size=self.buffer_size, size=self.size, data_url=self.data_url)
+        f = WebHdfsFile(self.name, user=self.user, buffer_size=self.buffer_size, orig=self)
         return f
 
     def get_size(self):
@@ -57,7 +59,8 @@ class WebHdfsFile(object):
         return file_status['length']
 
     def seek(self, offset, whence=0):
-        #print("Attempt to seek {} from {}".format(offset, whence))
+        # print("Attempt to seek {} from {}".format(offset, whence))
+
         if whence == os.SEEK_SET:
             self.offset = offset
         elif whence == os.SEEK_CUR:
@@ -68,25 +71,30 @@ class WebHdfsFile(object):
         return self.offset
 
     def prefetch(self, offset, length):
+        print(f'Prefetch {offset} {length}')
         if self.prefetch_buffer is None or length > len(self.prefetch_buffer):
             # print(length)
             del self.prefetch_buffer
-            self.prefetch_buffer = bytearray(length)
+            self.prefetch_buffer = bytearray(max(20<<20, length))
 
         view = memoryview(self.prefetch_buffer)
         self.read_stats.append((offset, length))
         req = f'{self.data_req}&offset={offset}&length={length}'
+        start = time.time()
         conn = http.client.HTTPConnection(self.data_url.netloc, blocksize=self.buffer_size)
         conn.request("GET", req)
         resp = conn.getresponse()
         resp.readinto(view[:length])
         conn.close()
+        end = time.time()
+        print(f"Read time is: {end - start:.3f} secs {length >> 20} MB at { (length >> 20) / (end - start):.3f} MB/s ")
         self.prefetch_offset = offset
         self.prefetch_length = length
 
     def read(self, length=-1):
         if self.verbose:
             print(f"Attempt to read from {self.offset} len {length}")
+
         pos = self.offset
         if length == -1:
             length = self.size - pos
@@ -99,13 +107,17 @@ class WebHdfsFile(object):
                 end = begin + length
                 return self.prefetch_buffer[begin:end]
 
-        self.read_stats.append((pos, length))
         req = f'{self.data_req}&offset={pos}&length={length}'
+        # start = time.time()
         conn = http.client.HTTPConnection(self.data_url.netloc, blocksize=self.buffer_size)
         conn.request("GET", req)
         resp = conn.getresponse()
         data = resp.read(length)
         conn.close()
+        # print(f'Prefetch miss {pos}, {length},  {self.prefetch_offset},{self.prefetch_length}')
+        # end = time.time()
+        # print(f"Prefetch miss Read time is: {end - start:.3f} secs {length >> 20} MB at {(length >> 20) / (end - start):.3f} MB/s ")
+
         return data
 
     def readinto(self, b):

@@ -11,6 +11,7 @@ import urllib.parse
 import numpy
 import duckdb
 import sqlparse
+import pyarrow
 
 from pydike.core.webhdfs import WebHdfsFile
 import pydike.core.parquet as parquet
@@ -58,35 +59,25 @@ class TpchSQL:
         conn.close()
 
     def local_run(self):
-        start = time.time()
         reader = parquet.get_reader(self.config['url'])
-        end = time.time()
-        self.log_message(f'ParquetReader time is: {end - start:.3f} secs')
-
-        start = time.time()
         tokens = sqlparse.parse(self.config['query'])[0].flatten()
         sql_columns = set([t.value for t in tokens if t.ttype in [sqlparse.tokens.Token.Name]])
 
         columns = [col for col in reader.columns if col in sql_columns]
         self.log_message(columns)
         rg = int(self.config['row_group'])
-
         df = reader.read_rg(rg, columns)
-
-        end = time.time()
-        self.log_message(f'read_rg time is: {end - start:.3f} secs')
-
-        start = time.time()
         con = duckdb.connect(database=':memory:')
-        con.register('arrow', df)
+
+        if isinstance(df, pyarrow.lib.Table):
+            con.register_arrow('arrow', df)
+        else:
+            con.register('arrow', df)
+
         con.execute(self.config['query'])
         self.df = con.fetchdf()
         con.unregister('arrow')
         con.close()
-
-        end = time.time()
-        self.log_message(f'duckdb time is: {end - start:.3f} secs')
-
 
         del df
         self.log_message(f'Computed df {self.df.shape}')
@@ -165,3 +156,5 @@ if __name__ == '__main__':
     print(f"Query time is: {end - start:.3f} secs")
     print(f'MemUsage {util.get_memory_usage_mb()}')
 
+# This can be used for memory consumption test
+# for i in $(seq 0 300) ; do python3 /opt/volume/python3/packages/pydike/client/tpch.py -s dikehdfs:9860 -r 8 -v 1 -n 1 ; done
