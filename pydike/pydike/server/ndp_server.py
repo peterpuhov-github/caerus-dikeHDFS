@@ -1,5 +1,7 @@
 #!/usr/bin/python3 -u
 import threading
+import time
+import gc
 import argparse
 import json
 import numpy
@@ -11,6 +13,7 @@ import urllib.parse
 import pydike.core.webhdfs
 import pydike.core.parquet
 import pydike.client.tpch
+import pydike.core.util as util
 
 
 class ChunkedWriter:
@@ -27,6 +30,9 @@ class ChunkedWriter:
 
 
 logging_lock = threading.Lock()
+
+def tpch_run(config):
+    return pydike.client.tpch.TpchSQL(config)
 
 class NdpRequestHandler(http.server.BaseHTTPRequestHandler):
     def log_message(self, format, *args):
@@ -57,6 +63,7 @@ class NdpRequestHandler(http.server.BaseHTTPRequestHandler):
                 setattr(self, 'op', op)
 
     def do_POST(self):
+        start = time.time()
         self.log(f'POST {self.path}')
         self.parse_url()
         data = self.rfile.read(int(self.headers['Content-Length']))
@@ -70,13 +77,26 @@ class NdpRequestHandler(http.server.BaseHTTPRequestHandler):
         self.log(f'config.url {config["url"]}')
 
         config['verbose'] = self.server.config.verbose
+        end = time.time()
+        self.log(f'Req time is: {end - start:.3f} secs')
+
+        start = time.time()
         tpch_sql = pydike.client.tpch.TpchSQL(config)
+        end = time.time()
+        self.log(f'Query time is: {end - start:.3f} secs')
+
+        start = time.time()
         self.send_response(HTTPStatus.OK)
         self.send_header('Transfer-Encoding', 'chunked')
         self.end_headers()
         writer = ChunkedWriter(self.wfile)
         tpch_sql.to_spark(writer)
         writer.close()
+        del tpch_sql
+        end = time.time()
+        self.log(f'Response time is: {end - start:.3f} secs')
+
+        self.log(f'MemUsage {util.get_memory_usage_mb()}')
 
 
     def do_GET(self):
