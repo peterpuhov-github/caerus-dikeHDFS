@@ -145,7 +145,11 @@ def run_test(row_group, args):
 def get_ndp_info(args):
     user = getpass.getuser()
     conn = http.client.HTTPConnection(args.server)
-    req = f'{args.file}?op=GETNDPINFO&user.name={user}&fs_type={args.fs_type}'
+    if args.fs_type != 'webhdfs':
+        req = f'{args.file}?op=GETNDPINFO&user.name={user}&fs_type={args.fs_type}'
+    else:
+        req = f'{args.file}?op=GETNDPINFO&user.name={user}'
+
     conn.request("GET", req)
     resp = conn.getresponse()
     resp_data = resp.read()

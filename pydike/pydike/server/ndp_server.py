@@ -54,13 +54,13 @@ class NdpRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def parse_url(self):
         url = urllib.parse.urlparse(self.path)
+        setattr(self, 'fs_type', 'webhdfs')
         for q in url.query.split('&'):
             if 'user.name=' in q:
                 user = q.split('user.name=')[1]
                 setattr(self, 'user', user)
             if 'fs_type=' in q:
-                fs_type = q.split('fs_type=')[1]
-                setattr(self, 'fs_type', fs_type)
+                self.fs_type = q.split('fs_type=')[1]
             if 'op=' in q:
                 op = q.split('op=')[1]
                 setattr(self, 'op', op)
