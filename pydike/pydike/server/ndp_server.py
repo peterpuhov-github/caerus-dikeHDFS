@@ -58,6 +58,9 @@ class NdpRequestHandler(http.server.BaseHTTPRequestHandler):
             if 'user.name=' in q:
                 user = q.split('user.name=')[1]
                 setattr(self, 'user', user)
+            if 'fs_type=' in q:
+                fs_type = q.split('fs_type=')[1]
+                setattr(self, 'fs_type', fs_type)
             if 'op=' in q:
                 op = q.split('op=')[1]
                 setattr(self, 'op', op)
@@ -76,6 +79,7 @@ class NdpRequestHandler(http.server.BaseHTTPRequestHandler):
         self.log(f'config.url {config["url"]}')
 
         config['verbose'] = self.server.config.verbose
+        config['fs_type'] = self.fs_type
 
         tpch_sql = pydike.client.tpch.TpchSQL(config)
 
@@ -119,7 +123,12 @@ class NdpRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def get_ndp_info(self):
         netloc = self.server.config.webhdfs
-        reader = pydike.core.parquet.get_reader(f'webhdfs://{netloc}/{self.path}')
+
+        if self.fs_type == 'webhdfs':
+            reader = pydike.core.parquet.get_reader(f'webhdfs://{netloc}/{self.path}')
+        else:
+            reader = pydike.core.parquet.get_reader(f'file://{netloc}/{self.path}')
+
         info = dict()
         info['columns'] = reader.columns
         info['dtypes'] = [t.name for t in reader.dtypes]

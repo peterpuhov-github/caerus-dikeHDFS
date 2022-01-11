@@ -59,7 +59,13 @@ class TpchSQL:
         conn.close()
 
     def local_run(self):
-        reader = parquet.get_reader(self.config['url'])
+        url = urllib.parse.urlparse(self.config['url'])
+        fs_type = self.config['fs_type']
+        if fs_type == 'webhdfs':
+            reader = parquet.get_reader(f'webhdfs://{url.netloc}/{url.path}?{url.query}')
+        else:
+            reader = parquet.get_reader(f'file://{url.netloc}/{url.path}?{url.query}')
+
         tokens = sqlparse.parse(self.config['query'])[0].flatten()
         sql_columns = set([t.value for t in tokens if t.ttype in [sqlparse.tokens.Token.Name]])
 
@@ -67,7 +73,7 @@ class TpchSQL:
         self.log_message(columns)
         rg = int(self.config['row_group'])
         df = reader.read_rg(rg, columns)
-        con = duckdb.connect(database=':memory:')
+        con = duckdb.connect(database=':memory:', config={'threads': 1})
 
         if isinstance(df, pyarrow.lib.Table):
             con.register_arrow('arrow', df)
@@ -129,8 +135,9 @@ def run_test(row_group, args):
     config['use_ndp'] = str(args.use_ndp == 1)
     config['row_group'] = str(row_group)
     config['query'] = "SELECT l_partkey, l_extendedprice, l_discount FROM arrow WHERE l_shipdate >= '1995-09-01' AND l_shipdate < '1995-10-01';"
-    config['url'] = f'http://{args.server}/{args.file}?op=SELECTCONTENT&user.name={user}'
+    config['url'] = f'http://{args.server}/{args.file}?op=SELECTCONTENT&user.name={user}&fs_type={args.fs_type}'
     config['verbose'] = args.verbose
+    config['fs_type'] = args.fs_type
 
     return TpchSQL(config)
 
@@ -138,7 +145,7 @@ def run_test(row_group, args):
 def get_ndp_info(args):
     user = getpass.getuser()
     conn = http.client.HTTPConnection(args.server)
-    req = f'{args.file}?op=GETNDPINFO&user.name={user}'
+    req = f'{args.file}?op=GETNDPINFO&user.name={user}&fs_type={args.fs_type}'
     conn.request("GET", req)
     resp = conn.getresponse()
     resp_data = resp.read()
@@ -147,13 +154,17 @@ def get_ndp_info(args):
     return ndp_info
 
 if __name__ == '__main__':
+    # fname = '/data/tpch-test-parquet/lineitem.parquet/part-00000-c498f3b7-c87f-4113-8e2f-0e5e0c99ccd5-c000.snappy.parquet'
     fname = '/tpch-test-parquet/lineitem.parquet'
+    
     parser = argparse.ArgumentParser(description='Run NDP server.')
     parser.add_argument('-s', '--server', default='dikehdfs:9860', help='NDP server http-address')
     parser.add_argument('-v', '--verbose', type=int, default='0', help='Verbose mode')
     parser.add_argument('-r', '--rg_count', type=int, default='1', help='Number of row groups to read')
     parser.add_argument('-n', '--use_ndp', type=int, default=1, help='Use NDP parameter')
     parser.add_argument('-f', '--file', default=fname, help='HDFS file')
+    parser.add_argument('-t', '--fs_type', default='webhdfs', help='File System prefix ["webhdfs" or "localfs"')
+
     args = parser.parse_args()
 
     rg_count = args.rg_count

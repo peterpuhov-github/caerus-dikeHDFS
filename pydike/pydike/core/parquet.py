@@ -1,5 +1,6 @@
 import time
 import threading
+import urllib.parse
 import fastparquet
 from fastparquet import core
 
@@ -57,7 +58,12 @@ class ParquetReader(fastparquet.ParquetFile):
 
 class ArrowParquetReader(pyarrow.parquet.ParquetFile):
     def __init__(self, path: str):
-        self.infile = WebHdfsFile(path)
+        self.url = urllib.parse.urlparse(path)
+        if self.url.scheme == 'webhdfs':
+            self.infile = WebHdfsFile(path)
+        else:
+            self.infile = open(self.url.path, 'rb')
+
         super(ArrowParquetReader, self).__init__(self.infile)
         self.columns = self.metadata.schema.names
         self.dtypes = [numpy.dtype(d.to_pandas_dtype()) for d in self.schema_arrow.types]
@@ -65,18 +71,32 @@ class ArrowParquetReader(pyarrow.parquet.ParquetFile):
         self.infile.close()
 
     def read_rg(self, index: int, columns: list):
-        fin = self.infile.clone()
+        if self.url.scheme == 'webhdfs':
+            fin = self.infile.clone()
+        else:
+            fin = open(self.url.path, 'rb')
+
         pfin = pyarrow.parquet.ParquetFile(fin, metadata=self.metadata)
         df = pfin.read_row_group(index, columns=columns)
         fin.close()
         return df
 
-
-if __name__ == '__main__':
+def get_webhdfs_reader():
     fname = '/tpch-test-parquet-1g/lineitem.parquet/' \
             'part-00000-badcef81-d816-44c1-b936-db91dae4c15f-c000.snappy.parquet'
 
-    reader = get_reader(f'webhdfs://dikehdfs:9870/{fname}?user.name=peter')
+    return get_reader(f'webhdfs://dikehdfs:9870/{fname}?user.name=peter')
+
+def get_file_reader():
+    fname = '/mnt/usb-SanDisk_Ultra_128GB/caerus-dikeHDFS/data/tpch-test-parquet-1g/lineitem.parquet/' \
+            'part-00000-badcef81-d816-44c1-b936-db91dae4c15f-c000.snappy.parquet'
+
+    return get_reader(f'file://dikehdfs:9870/{fname}?user.name=peter')
+
+if __name__ == '__main__':
+    # reader = get_file_reader()
+    reader = get_webhdfs_reader();
+
     print(reader.columns)
     dtypes = [t.name for t in reader.dtypes]
     print(dtypes)
