@@ -50,9 +50,36 @@
       <description>Block Replication factor</description>
     </property>
 
+   <property>
+      <name>dfs.stream-buffer-size</name>
+      <value>131072</value>
+      <description>Determines how much data is buffered during read and write operations</description>
+    </property>
+
+   <property>
+      <name>dfs.datanode.readahead.bytes</name>
+      <value>0</value>
+      <description>
+          Datanode can use the posix_fadvise system call to explicitly page data
+          into the operating system buffer cache ahead of the current reader's position.
+      </description>
+    </property>
+
+   <property>
+      <name>dfs.datanode.drop.cache.behind.reads</name>
+      <value>true</value>
+      <description>
+          Automatically purge all data from the buffer cache after it is delivered to the client.
+       </description>
+    </property>
 
     <!--
-    <prope
+    dfs.client.read.shortcircuit
+    dfs.domain.socket.path
+    dfs.client.domain.socket.data.traffic
+    -->
+    <!--
+    https://hadoop.apache.org/docs/r3.0.0/hadoop-project-dist/hadoop-hdfs/hdfs-default.xml
     <property>
       <name>dfs.client.use.datanode.hostname</name>
       <value>true</value>

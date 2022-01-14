@@ -177,6 +177,8 @@ if __name__ == '__main__':
         ndp_info = get_ndp_info(args)
         for key, value in ndp_info.items():
             print(f'{key} : {value}')
+    else:
+        args.server = 'dikehdfs:9870'
 
     start = time.time()
     executor = ThreadPoolExecutor(max_workers=rg_count)

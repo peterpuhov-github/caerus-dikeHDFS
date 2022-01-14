@@ -1,5 +1,7 @@
 #!/usr/bin/python3 -u
 import threading
+import multiprocessing
+from concurrent.futures import ThreadPoolExecutor
 import time
 import gc
 import argparse
@@ -15,6 +17,8 @@ import pydike.core.parquet
 import pydike.client.tpch
 import pydike.core.util as util
 
+
+executor = None
 
 class ChunkedWriter:
     def __init__(self, wfile):
@@ -140,10 +144,25 @@ class NdpRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(info_json.encode())
 
 
-class NdpServer(http.server.ThreadingHTTPServer):
+class NdpServer(http.server.HTTPServer):
     def __init__(self, server_address, handler, config):
+        self.request_queue_size = 128
         super().__init__(server_address, handler)
         self.config = config
+
+    def process_request_thread(self, request, client_address):
+        try:
+            self.finish_request(request, client_address)
+        except Exception:
+            self.handle_error(request, client_address)
+        finally:
+            self.shutdown_request(request)
+
+    def process_request(self, request, client_address):
+        executor.submit(self.process_request_thread, request, client_address)
+
+    def server_close(self):
+        executor.shutdown(wait=False)
 
 
 if __name__ == '__main__':
@@ -152,6 +171,8 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--port', type=int, default='9860', help='Server port')
     parser.add_argument('-v', '--verbose', type=int, default='0', help='Verbose mode')
     config = parser.parse_args()
+    executor = ThreadPoolExecutor(max_workers=(multiprocessing.cpu_count() - 2))
+
     print(f'Listening to port:{config.port} HDFS:{config.webhdfs}')
     ndp_server = NdpServer(('', config.port), NdpRequestHandler, config)
     try:
