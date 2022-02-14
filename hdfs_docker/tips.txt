@@ -1,0 +1,3 @@
+# How to install Hive on Ubuntu
+https://phoenixnap.com/kb/install-hive-on-ubuntu
+

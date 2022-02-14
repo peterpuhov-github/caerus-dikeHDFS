@@ -6,8 +6,11 @@ pushd "$(dirname "$0")" # connect to root
 ROOT_DIR=$(pwd)
 echo "ROOT_DIR ${ROOT_DIR}"
 
+USER_NAME=${SUDO_USER:=$USER}
+
 # Set the home directory in the Docker container.
 HADOOP_HOME=/opt/hadoop/hadoop-3.3.0
+HIVE_HOME=/opt/hive/apache-hive-3.1.2-bin
 
 # Create NameNode and DataNode mount points
 mkdir -p ${ROOT_DIR}/volume/namenode
@@ -38,16 +41,17 @@ DOCKER_RUN="docker run --rm=true ${DOCKER_IT} \
   -v ${ROOT_DIR}/volume/datanode0:/opt/volume/datanode \
   -v ${ROOT_DIR}/volume/status:/opt/volume/status \
   -v ${ROOT_DIR}/volume/logs:${HADOOP_HOME}/logs \
-  -v ${ROOT_DIR}/core-site.xml:${HADOOP_HOME}/etc/hadoop/core-site.xml \
-  -v ${ROOT_DIR}/hdfs-site.xml:${HADOOP_HOME}/etc/hadoop/hdfs-site.xml \
+  -v ${ROOT_DIR}/hadoop_home/etc/hadoop/core-site.xml:${HADOOP_HOME}/etc/hadoop/core-site.xml \
+  -v ${ROOT_DIR}/hadoop_home/etc/hadoop/hdfs-site.xml:${HADOOP_HOME}/etc/hadoop/hdfs-site.xml \
+  -v ${ROOT_DIR}/hive_home/conf/hive-site.xml:${HIVE_HOME}/conf/hive-site.xml \
   -v ${ROOT_DIR}/start-hdfs.sh:${HADOOP_HOME}/bin/start-hdfs.sh \
   -w ${HADOOP_HOME} \
   -e HADOOP_HOME=${HADOOP_HOME} \
-  -e HADOOP_CONF_DIR=${HADOOP_HOME}/etc/hadoop \
+  -e HIVE_HOME=${HIVE_HOME} \
   -e RUNNING_MODE=${RUNNING_MODE} \
   --network dike-net \
   --name hdfs-server  --hostname hdfs-server --ip 172.18.0.100 \
-  hdfs_server ${CMD}"
+  hdfs_server-${USER_NAME} ${CMD}"
 
 # echo ${DOCKER_RUN}
 
