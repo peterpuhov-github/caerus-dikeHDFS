@@ -10,6 +10,7 @@ if [ ! -f /opt/volume/namenode/current/VERSION ]; then
     "${HADOOP_HOME}/bin/hdfs" dfs -chmod g+w /tmp
     "${HADOOP_HOME}/bin/hdfs" dfs -mkdir -p /user/hive/warehouse
     "${HADOOP_HOME}/bin/hdfs" dfs -chmod g+w /user/hive/warehouse
+    $HIVE_HOME/bin/schematool -dbType derby -initSchema
 fi
 
 export HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
@@ -25,7 +26,7 @@ export CLASSPATH=$(bin/hadoop classpath)
 # Hive setup
 export PATH=$PATH:$HIVE_HOME/bin
 
-
+$HIVE_HOME/bin/hive --service metastore &
 
 echo "HADOOP_READY"
 echo "HADOOP_READY" > /opt/volume/status/HADOOP_STATE

@@ -17,6 +17,9 @@ mkdir -p ${ROOT_DIR}/volume/namenode
 mkdir -p ${ROOT_DIR}/volume/datanode0
 mkdir -p ${ROOT_DIR}/volume/logs
 
+# Create Hive metastore directory
+mkdir -p ${ROOT_DIR}/volume/metastore
+
 mkdir -p "${ROOT_DIR}/volume/status"
 rm -f ${ROOT_DIR}/volume/status/*
 
@@ -39,6 +42,7 @@ DOCKER_RUN="docker run --rm=true ${DOCKER_IT} \
   -v ${ROOT_DIR}/data:/data \
   -v ${ROOT_DIR}/volume/namenode:/opt/volume/namenode \
   -v ${ROOT_DIR}/volume/datanode0:/opt/volume/datanode \
+  -v ${ROOT_DIR}/volume/metastore:/opt/volume/metastore \
   -v ${ROOT_DIR}/volume/status:/opt/volume/status \
   -v ${ROOT_DIR}/volume/logs:${HADOOP_HOME}/logs \
   -v ${ROOT_DIR}/hadoop_home/etc/hadoop/core-site.xml:${HADOOP_HOME}/etc/hadoop/core-site.xml \

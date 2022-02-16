@@ -26,19 +26,20 @@ ENV ENV_HADOOP_VERSION=3.3.0
 ENV JAVA_HOME /usr/lib/jvm/java-8-openjdk-amd64
 
 RUN mkdir -p /opt/hadoop
-RUN curl -L https://downloads.apache.org/hadoop/common/hadoop-${ENV_HADOOP_VERSION}/hadoop-${ENV_HADOOP_VERSION}.tar.gz | tar -xz -C /opt/hadoop
+# RUN curl -L https://downloads.apache.org/hadoop/common/hadoop-${ENV_HADOOP_VERSION}/hadoop-${ENV_HADOOP_VERSION}.tar.gz | tar -xz -C /opt/hadoop
+ADD /hadoop-${ENV_HADOOP_VERSION}.tar.gz /opt/hadoop
 
 # https://dlcdn.apache.org/hive/hive-3.1.2/apache-hive-3.1.2-bin.tar.gz
 # https://downloads.apache.org/hive/hive-3.1.2/apache-hive-3.1.2-bin.tar.gz
 RUN mkdir -p /opt/hive
-RUN curl -L https://downloads.apache.org/hive/hive-3.1.2/apache-hive-3.1.2-bin.tar.gz | tar -xz -C /opt/hive
+# RUN curl -L https://downloads.apache.org/hive/hive-3.1.2/apache-hive-3.1.2-bin.tar.gz | tar -xz -C /opt/hive
+ADD /apache-hive-3.1.2-bin.tar.gz /opt/hive
 
 # Fix guava incompatibility issue
 ENV HADOOP_HOME=/opt/hadoop/hadoop-3.3.0
 ENV HIVE_HOME=/opt/hive/apache-hive-3.1.2-bin
-rm ${HIVE_HOME}/lib/guava-19.0.jar
-cp ${HADOOP_HOME}/share/hadoop/hdfs/lib/guava-27.0-jre.jar $HIVE_HOME/lib/
-
+RUN rm ${HIVE_HOME}/lib/guava-19.0.jar \
+    && cp ${HADOOP_HOME}/share/hadoop/hdfs/lib/guava-27.0-jre.jar $HIVE_HOME/lib/
 
 RUN apt-get -q update \
     && apt-get -q install -y --no-install-recommends \

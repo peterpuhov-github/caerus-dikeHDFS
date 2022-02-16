@@ -1,3 +1,16 @@
 # How to install Hive on Ubuntu
 https://phoenixnap.com/kb/install-hive-on-ubuntu
 
+# Remote metastore setup
+# On a client side
+${HIVE_HOME}/conf/hive-site.xml
+<property>
+    <name>hive.metastore.uris</name>
+    <value>thrift://hdfs-server:9083</value>
+</property>
+
+# On a server side
+$HIVE_HOME/bin/hive --service metastore
+
+https://github.com/quintoandar/hive-metastore-client
+

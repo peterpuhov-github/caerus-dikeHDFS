@@ -1,2 +1,4 @@
 data
 volume
+hadoop-*.tar.gz
+apache-hive*.tar.gz
