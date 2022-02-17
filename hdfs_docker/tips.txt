@@ -14,3 +14,12 @@ $HIVE_HOME/bin/hive --service metastore
 
 https://github.com/quintoandar/hive-metastore-client
 
+https://www.enterprisedb.com/postgres-tutorials/postgresql-replication-and-automatic-failover-tutorial
+
+https://docs.cloudera.com/cdp-private-cloud-upgrade/latest/upgrade-hdp3/topics/hive-migrate-hdp-catalog.html?
+
+https://github.com/Thriftpy/thriftpy2
+
+thrift -r --gen py hive_metastore.thrift
+
+
