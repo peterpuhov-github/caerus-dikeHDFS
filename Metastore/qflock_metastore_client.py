@@ -11,8 +11,8 @@ if __name__ == '__main__':
     # client = HiveMetastoreClient('dikehdfs', 9083).open()
     client = HiveMetastoreClient('localhost', 9090).open()
 
-    db_name = 'database3_dca'
-    catalog_name = 'spark'
+    db_name = 'database6_dca'
+    catalog_name = 'spark6'
 
     cs = client.get_catalogs()
     print(cs)

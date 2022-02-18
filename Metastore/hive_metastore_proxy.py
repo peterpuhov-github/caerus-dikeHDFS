@@ -39,36 +39,32 @@ class ThriftHiveMetastoreHandler:
 # Inspired by https://thrift.apache.org/tutorial/py.html
 if __name__ == '__main__':
     # Make socket
-    transport = TSocket.TSocket('dikehdfs', 9083)
-
+    client_transport = TSocket.TSocket('dikehdfs', 9083)
     # Buffering is critical. Raw sockets are very slow
-    transport = TTransport.TBufferedTransport(transport)
-
+    client_transport = TTransport.TBufferedTransport(client_transport)
     # Wrap in a protocol
-    protocol = TBinaryProtocol.TBinaryProtocol(transport)
-
+    client_protocol = TBinaryProtocol.TBinaryProtocol(client_transport)
     # Create a client to use the protocol encoder
-    client = ThriftHiveMetastore.Client(protocol)
-
+    client = ThriftHiveMetastore.Client(client_protocol)
     # Connect!
-    transport.open()
+    client_transport.open()
 
     catalogs = client.get_catalogs()
     print(catalogs)
 
     handler = ThriftHiveMetastoreHandler(client)
     processor = ThriftHiveMetastore.Processor(handler)
-    transport = TSocket.TServerSocket(host='127.0.0.1', port=9090)
+    server_transport = TSocket.TServerSocket(host='127.0.0.1', port=9090)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
 
-    server = TServer.TSimpleServer(processor, transport, tfactory, pfactory)
+    server = TServer.TSimpleServer(processor, server_transport, tfactory, pfactory)
 
     print('Starting the server...')
     server.serve()
 
     # Close!
-    transport.close()
+    client_transport.close()
 
 
 
